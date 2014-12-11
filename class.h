@@ -13,8 +13,8 @@ private:
     int portno;
 public:
     user() {this->name = ""; this->ip = ""; this->portno = 0;}
-    user(std::string name, std::string ip, u_short portno)
-    {this->name = name; this->ip = ip; this->portno = portno;}
+    user(std::string name, std::string ip, int portno)
+        {this->name = name; this->ip = ip; this->portno = portno;}
     std::string getName() {return this->name;}
     std::string getIp() {return this->ip;}
     int getPort() {return this->portno;}

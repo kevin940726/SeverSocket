@@ -2,13 +2,11 @@
 
 #include <iostream>
 #include <string>
+#include <cstdlib>
 #include <sys/types.h>
 #include <sys/socket.h>
-#include <netinet/in.h>
-#include <netdb.h>
 #include <arpa/inet.h>
 #include <regex.h>
-#include <stdio.h>
 #include <pthread.h>
 #include <list>
 
@@ -26,8 +24,8 @@ void errexit(std::string message){
 }
 
 int passivesock(u_short service){
-    struct sockaddr_in sin; //an Internet endpoint address
-    int s; //socket descriptor
+    struct sockaddr_in sin;
+    int s;
     memset(&sin, 0, sizeof(sin));
     sin.sin_family = AF_INET;
     sin.sin_addr.s_addr = INADDR_ANY;
@@ -36,7 +34,7 @@ int passivesock(u_short service){
     if ((s = socket(AF_INET, SOCK_STREAM, 0)) < 0)
         errexit("Failed to create socket.");
     
-    if (::bind(s, (struct sockaddr *)&sin, sizeof(sin)) < 0)
+    if (bind(s, (struct sockaddr *)&sin, sizeof(sin)) < 0)
         errexit("Bind error.");
     
     if (listen(s, SOMAXCONN) < 0)
@@ -54,10 +52,10 @@ struct passData{
 void *clientThread(void *clientData){
     std::string name, ip;
     int portno, sdc;
-    passData newusr = *(passData*) clientData;
-    ip = newusr.ip ;
-    portno =  newusr.portno;
-    sdc = newusr.sdc;
+    passData newClient = *(passData*) clientData;
+    ip = newClient.ip ;
+    portno =  newClient.portno;
+    sdc = newClient.sdc;
     std::cout << "Connected from " << ip << ":" << portno << std::endl;
     
     char buf[BLEN];
@@ -73,6 +71,7 @@ void *clientThread(void *clientData){
     while (true){
         if (recv(sdc, bptr, buflen, 0) > 0){
             buf[strlen(buf) - 2] = '\0';
+            
             if (regexec(&reg_regex, buf, 3, matches, 0) == 0){
                 buf[matches[1].rm_eo] = 0;
                 if (!strcmp(buf + matches[1].rm_so, "REGISTER")){
@@ -97,16 +96,18 @@ void *clientThread(void *clientData){
             }
             else if (!strcmp(buf, "Exit")){
                 send(sdc, "Bye\n", 3, 0);
-                shutdown(sdc, SHUT_RDWR);
                 remove(&lists, name);
+                break;
             }
             else{
                 send(sdc, "Unknown syntax error.\n", 23, 0);
             }
+            
             memset(buf, 0, BLEN);
         }
     }
     
+    shutdown(sdc, SHUT_RDWR);
     return 0;
 }
 
