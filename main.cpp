@@ -10,11 +10,7 @@
 #include <pthread.h>
 #include <list>
 
-#ifndef INADDR_NONE
-#define INADDR_NONE 0xffffffff
-#endif
-
-#define BLEN 1200
+#define BLEN 1024
 
 std::list<user> lists;
 
@@ -52,6 +48,7 @@ struct passData{
 void *clientThread(void *clientData){
     std::string name, ip;
     int portno, sdc;
+    ssize_t rec;
     passData newClient = *(passData*) clientData;
     ip = newClient.ip ;
     portno =  newClient.portno;
@@ -69,7 +66,7 @@ void *clientThread(void *clientData){
     regmatch_t matches[3];
     
     while (true){
-        if (recv(sdc, bptr, buflen, 0) > 0){
+        if ((rec = recv(sdc, bptr, buflen, 0)) > 0){
             buf[strlen(buf) - 2] = '\0';
             
             if (regexec(&reg_regex, buf, 3, matches, 0) == 0){
@@ -90,13 +87,15 @@ void *clientThread(void *clientData){
                         send(sdc, "220 AUTH_FAIL\n", 15, 0);
                     }
                 }
+                else{
+                    send(sdc, "220 AUTH_FAIL\n", 15, 0);
+                }
             }
             else if (!strcmp(buf, "List")){
                 send(sdc, printList(lists).c_str(), strlen(printList(lists).c_str()), 0);
             }
             else if (!strcmp(buf, "Exit")){
                 send(sdc, "Bye\n", 3, 0);
-                remove(&lists, name);
                 break;
             }
             else{
@@ -105,14 +104,16 @@ void *clientThread(void *clientData){
             
             memset(buf, 0, BLEN);
         }
+        else if (rec == 0) break;
     }
     
+    remove(&lists, name);
     shutdown(sdc, SHUT_RDWR);
     return 0;
 }
 
 int main(int argc, const char * argv[]) {
-    int sd = passivesock(5900);
+    int sd = passivesock(6900);
     int sdc;
     
     struct sockaddr_in clientAddr;
