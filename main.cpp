@@ -30,6 +30,9 @@ int passivesock(u_short service){
     if ((s = socket(AF_INET, SOCK_STREAM, 0)) < 0)
         errexit("Failed to create socket.");
     
+    bool sock_opt = true;
+    setsockopt(s, SOL_SOCKET, SO_REUSEADDR, (const char*)&sock_opt, sizeof(bool));
+    
     if (bind(s, (struct sockaddr *)&sin, sizeof(sin)) < 0)
         errexit("Bind error.");
     
@@ -67,8 +70,6 @@ void *clientThread(void *clientData){
     
     while (true){
         if ((rec = recv(sdc, bptr, buflen, 0)) > 0){
-            buf[strlen(buf) - 2] = '\0';
-            
             if (regexec(&reg_regex, buf, 3, matches, 0) == 0){
                 buf[matches[1].rm_eo] = 0;
                 if (!strcmp(buf + matches[1].rm_so, "REGISTER")){
@@ -108,12 +109,15 @@ void *clientThread(void *clientData){
     }
     
     remove(&lists, name);
+    std::cout << "Disconnected from " << ip << ":" << portno << std::endl;
     shutdown(sdc, SHUT_RDWR);
     return 0;
 }
 
 int main(int argc, const char * argv[]) {
-    int sd = passivesock(6900);
+    u_short portno = 6900;
+    if (argc == 2) portno = strtol(argv[1], NULL, 10);
+    int sd = passivesock(portno);
     int sdc;
     
     struct sockaddr_in clientAddr;
@@ -121,10 +125,11 @@ int main(int argc, const char * argv[]) {
     
     int threadCount = 0;
     pthread_t *thread;
-    thread = new pthread_t[threadCount];
+    thread = new pthread_t[threadCount+1];
     
     passData newClient;
     
+    std::cout << "Waiting..." << std::endl;
     while (true){
         if ((sdc = accept(sd, (struct sockaddr *)&clientAddr, &addrlen)) > 0){
             newClient.ip = inet_ntoa(clientAddr.sin_addr);
